@@ -8,16 +8,15 @@
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/contactRecyclerView"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginStart="1dp"
-        android:layout_marginTop="1dp"
-        android:layout_marginEnd="1dp"
-        android:layout_marginBottom="1dp"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="200dp"
+        app:layout_constraintBottom_toTopOf="@+id/buttonsContactAdd"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.0"
         tools:listitem="@layout/contact_layout" />
 
     <TextView
@@ -31,26 +30,57 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <Button
-        android:id="@+id/manualContactButton"
-        android:layout_width="wrap_content"
+
+    <LinearLayout
+        android:id="@+id/buttonsContactAdd"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Add Manually"
-        app:layout_constraintBottom_toBottomOf="@+id/contactRecyclerView"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.826"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/noContact"
-        app:layout_constraintVertical_bias="0.504" />
+        android:layout_alignParentBottom="true"
+        android:padding="15dp"
+        app:layout_constraintBottom_toTopOf="@+id/buttonSOS"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="1.0"
+        tools:layout_editor_absoluteX="0dp">
+
+        <Button
+            android:id="@+id/manualContactButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Add Manually"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.816"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="0.879" />
+
+        <Button
+            android:id="@+id/contactListButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Add from contacts"
+            app:layout_constraintBottom_toTopOf="@+id/buttonSOS"
+            app:layout_constraintEnd_toStartOf="@+id/manualContactButton"
+            app:layout_constraintHorizontal_bias="0.656"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="0.984" />
+    </LinearLayout>
 
     <Button
-        android:id="@+id/contactListButton"
+        android:id="@+id/buttonSOS"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Add from contacts"
+        android:layout_marginBottom="30dp"
+        android:gravity="center"
+        android:text="Send SOS!!!"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toStartOf="@+id/manualContactButton"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.498"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/noContact" />
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="1.0" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

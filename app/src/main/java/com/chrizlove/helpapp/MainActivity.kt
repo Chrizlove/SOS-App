@@ -1,35 +1,54 @@
 package com.chrizlove.helpapp
 
+import android.Manifest
 import android.app.Activity
 import android.content.ContentValues.TAG
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.provider.ContactsContract
+import android.telephony.SmsManager
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.chrizlove.helpapp.databinding.ActivityMainBinding
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var contactAdapter: ContactAdapter
     private lateinit var contactViewModel: ContactViewModel
+    private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
+    private lateinit var location: Location
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding= ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+
+        //requesting permissions
+        if(!checkSMSPermission()){
+            requestSMSPermission()
+        }
+        if(!checkLocationPermission()){
+            requestLocationPermission()
+        }
 
         //recycler view is setted up
         setUpReminderRecyclerView()
@@ -42,7 +61,7 @@ class MainActivity : AppCompatActivity() {
 
         contactViewModel.contacts.observe(this, Observer {
 
-            //change visibility of no reminders yet textview
+            //change visibility of no contacts yet textview
             if(contactViewModel.contacts.value?.isEmpty() == true)
             {
                 binding.noContact.visibility = View.VISIBLE
@@ -53,6 +72,7 @@ class MainActivity : AppCompatActivity() {
 
             //updating the recyclerview on any change
             contactAdapter.updateContacts(it)
+
         })
 
         //adding new contact
@@ -61,7 +81,124 @@ class MainActivity : AppCompatActivity() {
         //swipe to delete functionality
         swipeToDelete()
 
+        //send sos
+        sendSOS()
 
+    }
+
+    private fun sendSOS() {
+        binding.buttonSOS.setOnClickListener {
+            fusedLocationProviderClient=LocationServices.getFusedLocationProviderClient(this)
+            getCurrentLocationAndSendSMS()
+        }
+    }
+
+    private fun sendSMS() {
+        Log.d(TAG,"2")
+        if(checkSMSPermission()){
+            val smsManager: SmsManager
+            smsManager = SmsManager.getDefault()
+//            if (Build.VERSION.SDK_INT>=23) {
+//                //if SDK is greater that or equal to 23 then
+//                //this is how we will initialize the SmsManager
+//                smsManager = this.getSystemService(SmsManager::cla   NN ss.java)
+//            }
+//            else{
+//                //if user's SDK is less than 23 then
+//                //SmsManager will be initialized like this
+//                smsManager = SmsManager.getDefault()
+//            }
+            for (contact in contactViewModel.contacts.value!!){
+                smsManager.sendTextMessage(contact.c_number, null,
+                    "Hi, I am in an emergency! This is my location https://www.google.com/maps/?q="+location.latitude+","+location.longitude,
+                    null, null)
+            }
+        }
+        else{
+            requestSMSPermission()
+        }
+    }
+
+    private fun requestSMSPermission() {
+        ActivityCompat.requestPermissions(this,
+            arrayOf(Manifest.permission.SEND_SMS), PERMISSION_REQUEST_SMS)
+    }
+
+    private fun checkSMSPermission(): Boolean {
+        return ActivityCompat.checkSelfPermission(this,Manifest.permission.SEND_SMS)==PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun getCurrentLocationAndSendSMS() {
+        Log.d(TAG,"1")
+        if(checkLocationPermission()){
+            if(locationEnabled()){
+                fusedLocationProviderClient.lastLocation.addOnCompleteListener(this) {task->
+                    location=task.result
+                    if(location==null){
+
+                    }
+                    else{
+                        //SEND sms when gotten location
+                        sendSMS()
+                    }
+                }
+            }
+            else{
+                //send last known location
+            }
+        }
+        else{
+            //request permission
+            requestLocationPermission()
+        }
+    }
+
+    companion object{
+        private const val PERMISSION_REQUEST_ACCESS_LOCATION=100
+        private const val  PERMISSION_REQUEST_SMS=99
+    }
+
+    private fun requestLocationPermission() {
+            ActivityCompat.requestPermissions(this,
+                arrayOf( Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION),
+                PERMISSION_REQUEST_ACCESS_LOCATION)
+
+    }
+
+    private fun locationEnabled(): Boolean {
+        val locationManager: LocationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) || locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+    }
+
+    private fun checkLocationPermission(): Boolean {
+        if(ActivityCompat.checkSelfPermission(this,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED
+            && ActivityCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)
+        {
+            return true
+        }
+        return false
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if(requestCode== PERMISSION_REQUEST_ACCESS_LOCATION){
+            if(grantResults.isNotEmpty() && grantResults[0]==PackageManager.PERMISSION_DENIED){
+                Toast.makeText(applicationContext, "Permissions Required to Operate.", Toast.LENGTH_SHORT).show()
+                //again request permission
+                requestLocationPermission()
+            }
+        }
+        if(requestCode== PERMISSION_REQUEST_SMS){
+            if(grantResults.isNotEmpty() && grantResults[0]==PackageManager.PERMISSION_DENIED){
+                Toast.makeText(applicationContext, "Permissions Required to Operate.", Toast.LENGTH_SHORT).show()
+                //again request permission
+                requestSMSPermission()
+            }
+        }
     }
 
 
@@ -104,7 +241,6 @@ class MainActivity : AppCompatActivity() {
                         )
                     }
                     setNegativeButton("Cancel") { dialog, which ->
-
                     }
                     setView(dialoglayout)
                     show()
