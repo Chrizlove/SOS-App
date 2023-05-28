@@ -3,18 +3,17 @@ package com.chrizlove.helpapp
 import android.Manifest
 import android.app.Activity
 import android.app.ActivityManager
+import android.content.BroadcastReceiver
 import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorManager
 import android.location.Location
 import android.location.LocationManager
-import android.os.Build
 import android.os.Bundle
-import android.os.VibrationEffect
-import android.os.Vibrator
 import android.provider.ContactsContract
 import android.telephony.SmsManager
 import android.util.Log
@@ -26,6 +25,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -89,28 +89,6 @@ class MainActivity : AppCompatActivity(){
         //swipe to delete functionality
         swipeToDelete()
 
-
-//        // ShakeDetector initialization
-//        mSensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-//        mAccelerometer = mSensorManager!!.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-//        mShakeDetector = ShakeDetector()
-//        mShakeDetector!!.setOnShakeListener(object : OnShakeListener {
-//            @SuppressLint("MissingPermission")
-//            override fun onShake(count: Int) {
-//                // check if the user has shacked
-//                // the phone for 3 time in a row
-//                if (count == 3) {
-//                    // vibrate the phone
-//                    vibrate()
-//                    fusedLocationProviderClient=LocationServices.getFusedLocationProviderClient(applicationContext)
-//                    getCurrentLocationAndSendSMS()
-//                    Toast.makeText(applicationContext,"Shaken",Toast.LENGTH_SHORT).show()
-//                }
-//            }
-//        })
-//        // register the listener
-//        mSensorManager!!.registerListener(mShakeDetector, mAccelerometer, SensorManager.SENSOR_DELAY_UI)
-
         // start the service
         val sensorService = SensorService()
         val intent = Intent(this, sensorService.javaClass)
@@ -123,6 +101,10 @@ class MainActivity : AppCompatActivity(){
         binding.buttonSOS.setOnClickListener {
             sendSOS(this)
         }
+
+        // Register mMessageReceiver to receive messages.
+        LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver,
+            IntentFilter("my-event"));
 
 }
     // method to check if the service is running
@@ -197,6 +179,7 @@ class MainActivity : AppCompatActivity(){
     companion object{
         private const val PERMISSION_REQUEST_ACCESS_LOCATION=100
         private const val  PERMISSION_REQUEST_SMS=99
+        const val ACTION_SOS_SEND = "com.company.package.ACTION_SOS_SEND"
     }
 
     private fun requestLocationPermission() {
@@ -331,4 +314,24 @@ class MainActivity : AppCompatActivity(){
             }
         }
     }
+
+    // handler for received Intents for the "my-event" event
+    private val mMessageReceiver: BroadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            // Extract data included in the Intent
+            val message = intent.getStringExtra("message")
+            Log.d("RECIEVED",message.toString())
+            if(message.equals("sendSOS")){
+                sendSOS(applicationContext)
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Unregister since the activity is not visible
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mMessageReceiver);
+    }
+
+
 }

@@ -16,8 +16,7 @@ import android.os.Vibrator
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 
 
 class SensorService: Service() {
@@ -63,11 +62,11 @@ class SensorService: Service() {
                     vibrate()
 
                     //here i want to call the sendSos method that is in the mainActivity
-                    val mActivity = MainActivity()
-                    mActivity.sendSOS(applicationContext)
-                    Toast.makeText(applicationContext,"Shaken", Toast.LENGTH_SHORT).show()
+                    sendMessage()
+                    //Toast.makeText(applicationContext,"Shaken", Toast.LENGTH_SHORT).show()
                 }
             }
+
         })
         // register the listener
         mSensorManager!!.registerListener(mShakeDetector, mAccelerometer, SensorManager.SENSOR_DELAY_UI)
@@ -115,5 +114,12 @@ class SensorService: Service() {
         } else {
             vibrator.vibrate(500)
         }
+    }
+
+    private fun sendMessage() {
+        val intent = Intent("my-event")
+        // add data
+        intent.putExtra("message", "sendSOS")
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
     }
 }
