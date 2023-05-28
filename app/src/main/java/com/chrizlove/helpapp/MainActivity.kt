@@ -1,8 +1,8 @@
 package com.chrizlove.helpapp
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.ActivityManager
 import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
@@ -29,13 +29,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.chrizlove.helpapp.ShakeDetector.OnShakeListener
 import com.chrizlove.helpapp.databinding.ActivityMainBinding
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(){
     private lateinit var binding: ActivityMainBinding
     private lateinit var contactAdapter: ContactAdapter
     private lateinit var contactViewModel: ContactViewModel
@@ -45,7 +44,6 @@ class MainActivity : AppCompatActivity() {
     private var mAccelerometer: Sensor? = null
     private var mShakeDetector: ShakeDetector? = null
 
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding= ActivityMainBinding.inflate(layoutInflater)
@@ -53,10 +51,10 @@ class MainActivity : AppCompatActivity() {
 
 
         //requesting permissions
-        if(!checkSMSPermission()){
+        if(!checkSMSPermission(this)){
             requestSMSPermission()
         }
-        if(!checkLocationPermission()){
+        if(!checkLocationPermission(this)){
             requestLocationPermission()
         }
 
@@ -91,73 +89,71 @@ class MainActivity : AppCompatActivity() {
         //swipe to delete functionality
         swipeToDelete()
 
-        //send sos
-        sendSOS()
 
-        // ShakeDetector initialization
-        mSensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-        mAccelerometer = mSensorManager!!.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        mShakeDetector = ShakeDetector()
-        mShakeDetector!!.setOnShakeListener(object : OnShakeListener {
-            @SuppressLint("MissingPermission")
-            override fun onShake(count: Int) {
-                // check if the user has shacked
-                // the phone for 3 time in a row
-                if (count == 3) {
-                    // vibrate the phone
-                    vibrate()
-                    fusedLocationProviderClient=LocationServices.getFusedLocationProviderClient(applicationContext)
-                    getCurrentLocationAndSendSMS()
-                    Toast.makeText(applicationContext,"Shaken",Toast.LENGTH_SHORT).show()
-                }
-            }
-        })
-        // register the listener
-        mSensorManager!!.registerListener(mShakeDetector, mAccelerometer, SensorManager.SENSOR_DELAY_UI)
-}
+//        // ShakeDetector initialization
+//        mSensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+//        mAccelerometer = mSensorManager!!.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+//        mShakeDetector = ShakeDetector()
+//        mShakeDetector!!.setOnShakeListener(object : OnShakeListener {
+//            @SuppressLint("MissingPermission")
+//            override fun onShake(count: Int) {
+//                // check if the user has shacked
+//                // the phone for 3 time in a row
+//                if (count == 3) {
+//                    // vibrate the phone
+//                    vibrate()
+//                    fusedLocationProviderClient=LocationServices.getFusedLocationProviderClient(applicationContext)
+//                    getCurrentLocationAndSendSMS()
+//                    Toast.makeText(applicationContext,"Shaken",Toast.LENGTH_SHORT).show()
+//                }
+//            }
+//        })
+//        // register the listener
+//        mSensorManager!!.registerListener(mShakeDetector, mAccelerometer, SensorManager.SENSOR_DELAY_UI)
 
-    // method to vibrate the phone
-    fun vibrate() {
-        val vibrator = getSystemService(VIBRATOR_SERVICE) as Vibrator
-        val vibEff: VibrationEffect
-
-        // Android Q and above have some predefined vibrating patterns
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            vibEff = VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK)
-            vibrator.cancel()
-            vibrator.vibrate(vibEff)
-        } else {
-            vibrator.vibrate(500)
+        // start the service
+        val sensorService = SensorService()
+        val intent = Intent(this, sensorService.javaClass)
+        if (!isMyServiceRunning(sensorService.javaClass)) {
+            startService(intent)
+            //Toast.makeText(applicationContext,"Service start",Toast.LENGTH_SHORT).show()
         }
+
+        //button listener to send sos
+        binding.buttonSOS.setOnClickListener {
+            sendSOS(this)
+        }
+
+}
+    // method to check if the service is running
+    private fun isMyServiceRunning(serviceClass: Class<*>): Boolean {
+        val manager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+        for (service in manager.getRunningServices(Int.MAX_VALUE)) {
+            if (serviceClass.name == service.service.className) {
+                Log.i("Service status", "Running")
+                return true
+            }
+        }
+        Log.i("Service status", "Not running")
+        return false
     }
 
-    private fun sendSOS() {
-        binding.buttonSOS.setOnClickListener {
+    public fun sendSOS(context: Context) {
             fusedLocationProviderClient=LocationServices.getFusedLocationProviderClient(this)
-            getCurrentLocationAndSendSMS()
-        }
+            getCurrentLocationAndSendSMS(context)
     }
 
     private fun sendSMS() {
         Log.d(TAG,"2")
-        if(checkSMSPermission()){
+        if(checkSMSPermission(this)){
             val smsManager: SmsManager
             smsManager = SmsManager.getDefault()
-//            if (Build.VERSION.SDK_INT>=23) {
-//                //if SDK is greater that or equal to 23 then
-//                //this is how we will initialize the SmsManager
-//                smsManager = this.getSystemService(SmsManager::cla   NN ss.java)
-//            }
-//            else{
-//                //if user's SDK is less than 23 then
-//                //SmsManager will be initialized like this
-//                smsManager = SmsManager.getDefault()
-//            }
             for (contact in contactViewModel.contacts.value!!){
                 smsManager.sendTextMessage(contact.c_number, null,
                     "Hi, I am in an emergency! This is my location https://www.google.com/maps/?q="+location.latitude+","+location.longitude,
                     null, null)
             }
+            Toast.makeText(applicationContext,"SMS Sent",Toast.LENGTH_SHORT).show()
         }
         else{
             requestSMSPermission()
@@ -169,18 +165,18 @@ class MainActivity : AppCompatActivity() {
             arrayOf(Manifest.permission.SEND_SMS), PERMISSION_REQUEST_SMS)
     }
 
-    private fun checkSMSPermission(): Boolean {
-        return ActivityCompat.checkSelfPermission(this,Manifest.permission.SEND_SMS)==PackageManager.PERMISSION_GRANTED
+    private fun checkSMSPermission(context: Context): Boolean {
+        return ActivityCompat.checkSelfPermission(context,Manifest.permission.SEND_SMS)==PackageManager.PERMISSION_GRANTED
     }
 
-    private fun getCurrentLocationAndSendSMS() {
+    public fun getCurrentLocationAndSendSMS(context: Context) {
         Log.d(TAG,"1")
-        if(checkLocationPermission()){
-            if(locationEnabled()){
+        if(checkLocationPermission(context)){
+           if(locationEnabled()){
                 fusedLocationProviderClient.lastLocation.addOnCompleteListener(this) {task->
                     location=task.result
                     if(location==null){
-
+                    //do something later on
                     }
                     else{
                         //SEND sms when gotten location
@@ -215,9 +211,10 @@ class MainActivity : AppCompatActivity() {
         return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) || locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
     }
 
-    private fun checkLocationPermission(): Boolean {
-        if(ActivityCompat.checkSelfPermission(this,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED
-            && ActivityCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)
+
+    private fun checkLocationPermission(context: Context): Boolean {
+        if(ActivityCompat.checkSelfPermission(context,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED
+            && ActivityCompat.checkSelfPermission(context,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)
         {
             return true
         }
