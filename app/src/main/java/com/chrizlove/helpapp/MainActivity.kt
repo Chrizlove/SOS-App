@@ -40,9 +40,6 @@ class MainActivity : AppCompatActivity(){
     private lateinit var contactViewModel: ContactViewModel
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
     private lateinit var location: Location
-    private var mSensorManager: SensorManager? = null
-    private var mAccelerometer: Sensor? = null
-    private var mShakeDetector: ShakeDetector? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,12 +48,7 @@ class MainActivity : AppCompatActivity(){
 
 
         //requesting permissions
-        if(!checkSMSPermission(this)){
-            requestSMSPermission()
-        }
-        if(!checkLocationPermission(this)){
-            requestLocationPermission()
-        }
+        requestAllPermission()
 
         //recycler view is setted up
         setUpReminderRecyclerView()
@@ -107,6 +99,17 @@ class MainActivity : AppCompatActivity(){
             IntentFilter("my-event"));
 
 }
+
+    private fun requestAllPermission() {
+        //requesting permissions
+        if(!checkSMSPermission(this)){
+            requestSMSPermission()
+        }
+        if(!checkLocationPermission(this)){
+            requestLocationPermission()
+        }
+    }
+
     // method to check if the service is running
     private fun isMyServiceRunning(serviceClass: Class<*>): Boolean {
         val manager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
@@ -125,15 +128,24 @@ class MainActivity : AppCompatActivity(){
             getCurrentLocationAndSendSMS(context)
     }
 
-    private fun sendSMS() {
+    private fun sendSMS(code: Int) {
         Log.d(TAG,"2")
         if(checkSMSPermission(this)){
             val smsManager: SmsManager
             smsManager = SmsManager.getDefault()
             for (contact in contactViewModel.contacts.value!!){
-                smsManager.sendTextMessage(contact.c_number, null,
-                    "Hi, I am in an emergency! This is my location https://www.google.com/maps/?q="+location.latitude+","+location.longitude,
-                    null, null)
+                if(code==1){
+                    smsManager.sendTextMessage(
+                        contact.c_number, null,
+                        "Hi, I am in an emergency! GPS was turned off, could not provide location. Kindly contact Authorities",
+                        null, null)
+                }
+                else if(code==2) {
+                    smsManager.sendTextMessage(
+                        contact.c_number, null,
+                        "Hi, I am in an emergency! This is my location https://www.google.com/maps/?q=" + location.latitude + "," + location.longitude,
+                        null, null)
+                }
             }
             Toast.makeText(applicationContext,"SMS Sent",Toast.LENGTH_SHORT).show()
         }
@@ -151,23 +163,25 @@ class MainActivity : AppCompatActivity(){
         return ActivityCompat.checkSelfPermission(context,Manifest.permission.SEND_SMS)==PackageManager.PERMISSION_GRANTED
     }
 
-    public fun getCurrentLocationAndSendSMS(context: Context) {
+    private fun getCurrentLocationAndSendSMS(context: Context) {
         Log.d(TAG,"1")
         if(checkLocationPermission(context)){
            if(locationEnabled()){
                 fusedLocationProviderClient.lastLocation.addOnCompleteListener(this) {task->
-                    location=task.result
-                    if(location==null){
-                    //do something later on
+                    if(task.result==null){
+                    //send sms withount location
+                        sendSMS(1)
                     }
                     else{
                         //SEND sms when gotten location
-                        sendSMS()
+                        location=task.result
+                        sendSMS(2)
                     }
                 }
             }
             else{
-                //send last known location
+               //send sms withount location
+                sendSMS(1)
             }
         }
         else{
@@ -179,21 +193,18 @@ class MainActivity : AppCompatActivity(){
     companion object{
         private const val PERMISSION_REQUEST_ACCESS_LOCATION=100
         private const val  PERMISSION_REQUEST_SMS=99
-        const val ACTION_SOS_SEND = "com.company.package.ACTION_SOS_SEND"
     }
 
     private fun requestLocationPermission() {
             ActivityCompat.requestPermissions(this,
                 arrayOf( Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION),
                 PERMISSION_REQUEST_ACCESS_LOCATION)
-
     }
 
     private fun locationEnabled(): Boolean {
         val locationManager: LocationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) || locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
     }
-
 
     private fun checkLocationPermission(context: Context): Boolean {
         if(ActivityCompat.checkSelfPermission(context,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED
@@ -212,32 +223,30 @@ class MainActivity : AppCompatActivity(){
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if(requestCode== PERMISSION_REQUEST_ACCESS_LOCATION){
             if(grantResults.isNotEmpty() && grantResults[0]==PackageManager.PERMISSION_DENIED){
-                Toast.makeText(applicationContext, "Permissions Required to Operate.", Toast.LENGTH_SHORT).show()
+                //Toast.makeText(applicationContext, "Permissions Required to Operate.", Toast.LENGTH_SHORT).show()
                 //again request permission
-                requestLocationPermission()
+                requestAllPermission()
             }
         }
         if(requestCode== PERMISSION_REQUEST_SMS){
             if(grantResults.isNotEmpty() && grantResults[0]==PackageManager.PERMISSION_DENIED){
-                Toast.makeText(applicationContext, "Permissions Required to Operate.", Toast.LENGTH_SHORT).show()
+                //Toast.makeText(applicationContext, "Permissions Required to Operate.", Toast.LENGTH_SHORT).show()
                 //again request permission
-                requestSMSPermission()
+                requestAllPermission()
             }
         }
     }
 
-
     private fun swipeToDelete() {
         val item= object: SwipeToDelete(this,0, ItemTouchHelper.RIGHT){
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
-
                 //remove contact from room db
                 contactViewModel.delete(contactAdapter.getContact(viewHolder.adapterPosition))
                 //remove reminder from recyclerview
                 contactAdapter.deleteContacts(viewHolder.adapterPosition)
-
             }
         }
+
         val itemTouchHelper = ItemTouchHelper(item)
         itemTouchHelper.attachToRecyclerView(binding.contactRecyclerView)
     }
@@ -315,7 +324,7 @@ class MainActivity : AppCompatActivity(){
         }
     }
 
-    // handler for received Intents for the "my-event" event
+    // handler for received Intents that calls sendSOS method
     private val mMessageReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             // Extract data included in the Intent
@@ -328,9 +337,9 @@ class MainActivity : AppCompatActivity(){
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         // Unregister since the activity is not visible
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(mMessageReceiver);
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mMessageReceiver)
+        super.onDestroy()
     }
 
 

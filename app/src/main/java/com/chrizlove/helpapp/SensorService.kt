@@ -39,13 +39,11 @@ class SensorService: Service() {
     override fun onCreate() {
         super.onCreate()
         //debug toast
-        Toast.makeText(applicationContext,"Service started", Toast.LENGTH_SHORT).show()
+        //Toast.makeText(applicationContext,"Service started", Toast.LENGTH_SHORT).show()
 
         // start the foreground service
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startMyOwnForeground() else startForeground(
-            1,
-            Notification()
-        )
+            1, Notification() )
 
         // ShakeDetector initialization
         mSensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
@@ -116,6 +114,7 @@ class SensorService: Service() {
         }
     }
 
+    //sends broadcast for sendSOS method to be invoked
     private fun sendMessage() {
         val intent = Intent("my-event")
         // add data
