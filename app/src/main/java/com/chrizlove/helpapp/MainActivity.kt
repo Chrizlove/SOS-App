@@ -1,33 +1,39 @@
 package com.chrizlove.helpapp
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorManager
 import android.location.Location
 import android.location.LocationManager
 import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.provider.ContactsContract
 import android.telephony.SmsManager
 import android.util.Log
-import android.view.LayoutInflater
 import android.view.View
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.chrizlove.helpapp.ShakeDetector.OnShakeListener
 import com.chrizlove.helpapp.databinding.ActivityMainBinding
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -35,6 +41,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var contactViewModel: ContactViewModel
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
     private lateinit var location: Location
+    private var mSensorManager: SensorManager? = null
+    private var mAccelerometer: Sensor? = null
+    private var mShakeDetector: ShakeDetector? = null
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,6 +94,41 @@ class MainActivity : AppCompatActivity() {
         //send sos
         sendSOS()
 
+        // ShakeDetector initialization
+        mSensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+        mAccelerometer = mSensorManager!!.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        mShakeDetector = ShakeDetector()
+        mShakeDetector!!.setOnShakeListener(object : OnShakeListener {
+            @SuppressLint("MissingPermission")
+            override fun onShake(count: Int) {
+                // check if the user has shacked
+                // the phone for 3 time in a row
+                if (count == 3) {
+                    // vibrate the phone
+                    vibrate()
+                    fusedLocationProviderClient=LocationServices.getFusedLocationProviderClient(applicationContext)
+                    getCurrentLocationAndSendSMS()
+                    Toast.makeText(applicationContext,"Shaken",Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
+        // register the listener
+        mSensorManager!!.registerListener(mShakeDetector, mAccelerometer, SensorManager.SENSOR_DELAY_UI)
+}
+
+    // method to vibrate the phone
+    fun vibrate() {
+        val vibrator = getSystemService(VIBRATOR_SERVICE) as Vibrator
+        val vibEff: VibrationEffect
+
+        // Android Q and above have some predefined vibrating patterns
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            vibEff = VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK)
+            vibrator.cancel()
+            vibrator.vibrate(vibEff)
+        } else {
+            vibrator.vibrate(500)
+        }
     }
 
     private fun sendSOS() {
@@ -269,7 +314,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setUpReminderRecyclerView() {
-        contactAdapter = ContactAdapter(this,)
+        contactAdapter = ContactAdapter(this)
         val layoutManager =  LinearLayoutManager(this)
         binding.contactRecyclerView.layoutManager = layoutManager
         binding.contactRecyclerView.adapter = contactAdapter
